@@ -13,8 +13,8 @@ Live: https://joho9119.github.io/feed-tracker/
 Entries sync between phones through an Airtable base with two tables:
 
 - **Feeds**: **Start** (date/time), **Left duration** and **Right duration** (durations, exact seconds), plus
-  **Left** and **Right** (numbers, the durations rounded to minutes for readability)
-- **Diapers**: **Time** (date/time), **Pee** and **Poop** (checkboxes)
+  **Left** and **Right** (numbers, the durations rounded to minutes for readability), **Note** (long text)
+- **Diapers**: **Time** (date/time), **Pee** and **Poop** (checkboxes), **Note** (long text)
  Tap the sync status in the top-right corner and enter the base ID (or paste any
 Airtable link to the base) plus a personal access token with `data.records:read` and `data.records:write` scoped to
 that base. Both are stored only on the device.
