@@ -86,6 +86,41 @@
   .dialog-actions { display: flex; gap: 8px; }
   .dialog-actions .btn-primary { width: auto; flex: 1; padding: 10px; }
   li .pending { color: #e0a526; }
+  li .tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    margin-left: 4px;
+    border-radius: 6px;
+    vertical-align: 2px;
+    background: color-mix(in srgb, #4a90d9 15%, transparent);
+    color: #4a90d9;
+  }
+  .tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 16px;
+    border-radius: 12px;
+    background: var(--bg);
+  }
+  .tabs button { padding: 8px; background: none; color: var(--muted); font-weight: 600; }
+  .tabs button[aria-selected=true] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+  .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .toggle {
+    padding: 20px 0;
+    font-size: 18px;
+    font-weight: 600;
+    background: var(--bg);
+    color: var(--text);
+    border: 2px solid var(--border);
+  }
+  .toggle[aria-pressed=true] {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    border-color: var(--accent);
+    color: var(--accent-dark);
+  }
   h2 { font-size: 15px; margin: 0; }
   .card {
     background: var(--card);
@@ -171,7 +206,7 @@
   .btn-primary:disabled { opacity: .5; }
   .btn-link { background: none; color: var(--muted); padding: 10px 0 0; width: 100%; }
   .day-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
-  .day-head span { font-size: 13px; color: var(--muted); }
+  .day-head span { font-size: 13px; color: var(--muted); text-align: right; }
   ul { list-style: none; margin: 0; padding: 0; }
   li {
     display: flex;
@@ -198,46 +233,59 @@
   </header>
 
   <section class="card">
-    <label class="field" for="start">Start of feed</label>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-mode="feed">Feed</button>
+      <button type="button" role="tab" data-mode="diaper">Diaper</button>
+    </div>
+
+    <label class="field" for="start" id="startLabel">Start of feed</label>
     <div class="row">
       <input type="datetime-local" id="start">
       <button class="btn-secondary" id="nowBtn" type="button">Now</button>
     </div>
 
-    <div class="sides">
-      <div class="side">
-        <label class="field" for="left">Left</label>
-        <div class="stepper">
-          <button type="button" data-target="left" data-step="-1" aria-label="Left minus one">−</button>
-          <input type="number" id="left" inputmode="numeric" min="0" max="180" value="0">
-          <button type="button" data-target="left" data-step="1" aria-label="Left plus one">+</button>
+    <div id="feedFields">
+      <div class="sides">
+        <div class="side">
+          <label class="field" for="left">Left</label>
+          <div class="stepper">
+            <button type="button" data-target="left" data-step="-1" aria-label="Left minus one">−</button>
+            <input type="number" id="left" inputmode="numeric" min="0" max="180" value="0">
+            <button type="button" data-target="left" data-step="1" aria-label="Left plus one">+</button>
+          </div>
+          <div class="unit">min</div>
+          <div class="quick">
+            <button type="button" data-target="left" data-step="-30">−30</button>
+            <button type="button" data-target="left" data-step="-15">−15</button>
+            <button type="button" data-target="left" data-step="15">+15</button>
+            <button type="button" data-target="left" data-step="30">+30</button>
+          </div>
         </div>
-        <div class="unit">min</div>
-        <div class="quick">
-          <button type="button" data-target="left" data-step="-30">−30</button>
-          <button type="button" data-target="left" data-step="-15">−15</button>
-          <button type="button" data-target="left" data-step="15">+15</button>
-          <button type="button" data-target="left" data-step="30">+30</button>
+        <div class="side">
+          <label class="field" for="right">Right</label>
+          <div class="stepper">
+            <button type="button" data-target="right" data-step="-1" aria-label="Right minus one">−</button>
+            <input type="number" id="right" inputmode="numeric" min="0" max="180" value="0">
+            <button type="button" data-target="right" data-step="1" aria-label="Right plus one">+</button>
+          </div>
+          <div class="unit">min</div>
+          <div class="quick">
+            <button type="button" data-target="right" data-step="-30">−30</button>
+            <button type="button" data-target="right" data-step="-15">−15</button>
+            <button type="button" data-target="right" data-step="15">+15</button>
+            <button type="button" data-target="right" data-step="30">+30</button>
+          </div>
         </div>
       </div>
-      <div class="side">
-        <label class="field" for="right">Right</label>
-        <div class="stepper">
-          <button type="button" data-target="right" data-step="-1" aria-label="Right minus one">−</button>
-          <input type="number" id="right" inputmode="numeric" min="0" max="180" value="0">
-          <button type="button" data-target="right" data-step="1" aria-label="Right plus one">+</button>
-        </div>
-        <div class="unit">min</div>
-        <div class="quick">
-          <button type="button" data-target="right" data-step="-30">−30</button>
-          <button type="button" data-target="right" data-step="-15">−15</button>
-          <button type="button" data-target="right" data-step="15">+15</button>
-          <button type="button" data-target="right" data-step="30">+30</button>
-        </div>
-      </div>
+      <div class="summary" id="summary"></div>
     </div>
 
-    <div class="summary" id="summary"></div>
+    <div id="diaperFields" hidden>
+      <div class="toggles">
+        <button type="button" class="toggle" id="peeBtn" aria-pressed="false">Pee</button>
+        <button type="button" class="toggle" id="poopBtn" aria-pressed="false">Poop</button>
+      </div>
+    </div>
 
     <button class="btn-primary" id="saveBtn" type="button">Save feed</button>
     <button class="btn-link" id="cancelBtn" type="button" hidden>Cancel edit</button>
@@ -253,8 +301,8 @@
 <dialog id="settings">
   <h2>Sync with Airtable</h2>
   <p class="hint">
-    Both phones use the same base and token. The base needs a <b>Feeds</b> table with
-    <b>Start</b>, <b>Left</b> and <b>Right</b> fields.
+    Both phones use the same base and token. The base needs a <b>Feeds</b> table
+    (<b>Start</b>, <b>Left</b>, <b>Right</b>) and a <b>Diapers</b> table (<b>Time</b>, <b>Pee</b>, <b>Poop</b>).
   </p>
   <label class="field" for="baseInput">Airtable base (ID or any link to it)</label>
   <input type="text" id="baseInput" class="setting" placeholder="app…" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -269,19 +317,35 @@
 </dialog>
 
 <script>
-// Feeds sync to an Airtable table. localStorage is the offline cache: new
-// feeds get a "local-" id until Airtable assigns a "rec" id, edits to synced
-// feeds are flagged `pending`, and deletes wait in a queue until pushed.
-const TABLE = 'Feeds';
+// Entries sync to Airtable, one table per entry type. localStorage is the
+// offline cache: new entries get a "local-" id until Airtable assigns a "rec"
+// id, edits to synced entries are flagged `pending`, and deletes wait in a
+// queue until pushed.
+const TYPES = {
+  feed: {
+    table: 'Feeds',
+    fields: ['Start', 'Left', 'Right'],
+    toFields: (e) => ({ Start: e.start, Left: e.left, Right: e.right }),
+    fromFields: (f) => ({ start: f.Start, left: f.Left || 0, right: f.Right || 0 }),
+  },
+  diaper: {
+    table: 'Diapers',
+    fields: ['Time', 'Pee', 'Poop'],
+    toFields: (e) => ({ Time: e.start, Pee: e.pee, Poop: e.poop }),
+    fromFields: (f) => ({ start: f.Time, pee: !!f.Pee, poop: !!f.Poop }),
+  },
+};
 const SYNC_DAYS = 30;
 const POLL_MS = 30000;
-const K = { feeds: 'feeds.v1', deleted: 'feeds.deleted', token: 'airtable.token', base: 'airtable.base' };
+const K = { entries: 'feeds.v1', deleted: 'feeds.deleted', token: 'airtable.token', base: 'airtable.base' };
 const $ = (id) => document.getElementById(id);
 
-let feeds = loadJson(K.feeds, []);
-let deleted = loadJson(K.deleted, []);
+// Entries saved before diapers existed have no type; deletes were bare ids.
+let entries = loadJson(K.entries, []).map((e) => ({ type: 'feed', ...e }));
+let deleted = loadJson(K.deleted, []).map((d) => (typeof d === 'string' ? { id: d, type: 'feed' } : d));
 let token = localStorage.getItem(K.token) || '';
 let base = localStorage.getItem(K.base) || '';
+let mode = 'feed';
 let editingId = null;
 let sync_ = { running: false, again: false, state: 'idle', at: null };
 
@@ -291,13 +355,14 @@ function loadJson(key, fallback) {
 }
 
 function persist() {
-  localStorage.setItem(K.feeds, JSON.stringify(feeds));
+  localStorage.setItem(K.entries, JSON.stringify(entries));
   localStorage.setItem(K.deleted, JSON.stringify(deleted));
 }
 
-const isLocal = (f) => !f.id.startsWith('rec');
-const unsyncedCount = () => feeds.filter((f) => isLocal(f) || f.pending).length + deleted.length;
-const sortFeeds = () => feeds.sort((a, b) => new Date(b.start) - new Date(a.start));
+const isLocal = (e) => !e.id.startsWith('rec');
+const unsyncedCount = () => entries.filter((e) => isLocal(e) || e.pending).length + deleted.length;
+const sortEntries = () => entries.sort((a, b) => new Date(b.start) - new Date(a.start));
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // datetime-local needs "YYYY-MM-DDTHH:MM" in local time
 function toLocalInput(date) {
@@ -310,8 +375,16 @@ function minutes(id) {
   return Number.isFinite(n) && n > 0 ? Math.min(n, 180) : 0;
 }
 
+const pressed = (id) => $(id).getAttribute('aria-pressed') === 'true';
+const setPressed = (id, on) => $(id).setAttribute('aria-pressed', String(on));
+
 function endOf(feed) {
   return new Date(new Date(feed.start).getTime() + (feed.left + feed.right) * 60000);
+}
+
+function diaperLabel(e) {
+  if (e.pee && e.poop) return 'Pee & poop';
+  return e.pee ? 'Pee' : 'Poop';
 }
 
 const fmtTime = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -326,8 +399,8 @@ const fmtDay = (d) => {
 
 // ---------- Airtable ----------
 
-async function api(path, { method = 'GET', body } = {}) {
-  const res = await fetch(`https://api.airtable.com/v0/${base}/${TABLE}${path}`, {
+async function api(type, path, { method = 'GET', body } = {}) {
+  const res = await fetch(`https://api.airtable.com/v0/${base}/${TYPES[type].table}${path}`, {
     method,
     headers: { Authorization: `Bearer ${token}`, ...(body && { 'Content-Type': 'application/json' }) },
     body: body && JSON.stringify(body),
@@ -340,28 +413,33 @@ async function api(path, { method = 'GET', body } = {}) {
   return res.json();
 }
 
-const toFields = (f) => ({ Start: f.start, Left: f.left, Right: f.right });
-
-async function fetchRecent() {
+async function fetchRecent(type) {
+  const { fields, fromFields } = TYPES[type];
+  const timeField = fields[0];
   const params = new URLSearchParams({
-    filterByFormula: `IS_AFTER({Start}, DATEADD(NOW(), -${SYNC_DAYS}, 'days'))`,
-    'sort[0][field]': 'Start',
+    filterByFormula: `IS_AFTER({${timeField}}, DATEADD(NOW(), -${SYNC_DAYS}, 'days'))`,
+    'sort[0][field]': timeField,
     'sort[0][direction]': 'desc',
     pageSize: '100',
   });
-  ['Start', 'Left', 'Right'].forEach((f) => params.append('fields[]', f));
+  fields.forEach((f) => params.append('fields[]', f));
   const out = [];
   let offset;
   do {
     if (offset) params.set('offset', offset);
-    const page = await api(`?${params}`);
+    const page = await api(type, `?${params}`);
     for (const r of page.records) {
-      if (!r.fields.Start) continue;
-      out.push({ id: r.id, start: r.fields.Start, left: r.fields.Left || 0, right: r.fields.Right || 0 });
+      if (!r.fields[timeField]) continue;
+      out.push({ id: r.id, type, ...fromFields(r.fields) });
     }
     offset = page.offset;
   } while (offset);
   return out;
+}
+
+async function fetchAll() {
+  const lists = await Promise.all(Object.keys(TYPES).map(fetchRecent));
+  return lists.flat();
 }
 
 // A record-level 403/404/422 after the token has just been proven valid means
@@ -369,46 +447,51 @@ async function fetchRecent() {
 const isGone = (err) => [403, 404, 422].includes(err.status);
 
 async function pushChanges() {
-  for (const id of [...deleted]) {
-    try { await api(`/${id}`, { method: 'DELETE' }); }
+  for (const d of [...deleted]) {
+    try { await api(d.type, `/${d.id}`, { method: 'DELETE' }); }
     catch (err) { if (!isGone(err)) throw err; }
-    deleted = deleted.filter((x) => x !== id);
+    deleted = deleted.filter((x) => x.id !== d.id);
     persist();
   }
 
-  for (const f of feeds.filter((x) => !isLocal(x) && x.pending)) {
+  for (const e of entries.filter((x) => !isLocal(x) && x.pending)) {
     try {
-      await api(`/${f.id}`, { method: 'PATCH', body: { fields: toFields(f) } });
-      f.pending = false; // no-op if the user replaced this object mid-request
+      await api(e.type, `/${e.id}`, { method: 'PATCH', body: { fields: TYPES[e.type].toFields(e) } });
+      e.pending = false; // no-op if the user replaced this object mid-request
     } catch (err) {
       if (!isGone(err)) throw err;
-      feeds = feeds.filter((x) => x !== f);
+      entries = entries.filter((x) => x !== e);
     }
     persist();
   }
 
-  const creates = feeds.filter(isLocal);
-  for (let i = 0; i < creates.length; i += 10) {
-    const batch = creates.slice(i, i + 10);
-    const res = await api('', { method: 'POST', body: { records: batch.map((f) => ({ fields: toFields(f) })) } });
-    batch.forEach((sent, j) => {
-      const recId = res.records[j].id;
-      const current = feeds.find((x) => x.id === sent.id);
-      if (!current) { deleted.push(recId); return; } // deleted while in flight
-      current.pending = current !== sent; // edited while in flight: push again
-      current.id = recId;
-      if (editingId === sent.id) editingId = recId;
-    });
-    persist();
+  for (const type of Object.keys(TYPES)) {
+    const creates = entries.filter((e) => e.type === type && isLocal(e));
+    for (let i = 0; i < creates.length; i += 10) {
+      const batch = creates.slice(i, i + 10);
+      const res = await api(type, '', {
+        method: 'POST',
+        body: { records: batch.map((e) => ({ fields: TYPES[type].toFields(e) })) },
+      });
+      batch.forEach((sent, j) => {
+        const recId = res.records[j].id;
+        const current = entries.find((x) => x.id === sent.id);
+        if (!current) { deleted.push({ id: recId, type }); return; } // deleted while in flight
+        current.pending = current !== sent; // edited while in flight: push again
+        current.id = recId;
+        if (editingId === sent.id) editingId = recId;
+      });
+      persist();
+    }
   }
 }
 
 function mergeRemote(remote) {
-  const gone = new Set(deleted);
-  const local = feeds.filter((f) => isLocal(f) || f.pending);
-  const localIds = new Set(local.map((f) => f.id));
-  feeds = [...remote.filter((r) => !gone.has(r.id) && !localIds.has(r.id)), ...local];
-  sortFeeds();
+  const gone = new Set(deleted.map((d) => d.id));
+  const local = entries.filter((e) => isLocal(e) || e.pending);
+  const localIds = new Set(local.map((e) => e.id));
+  entries = [...remote.filter((r) => !gone.has(r.id) && !localIds.has(r.id)), ...local];
+  sortEntries();
   persist();
 }
 
@@ -419,10 +502,10 @@ async function sync() {
   sync_.state = 'busy';
   renderStatus();
   try {
-    let remote = await fetchRecent(); // also proves the token and base work
+    let remote = await fetchAll(); // also proves the token and base work
     if (unsyncedCount() > 0) {
       await pushChanges();
-      remote = await fetchRecent();
+      remote = await fetchAll();
     }
     mergeRemote(remote);
     sync_.state = 'ok';
@@ -453,8 +536,22 @@ function renderStatus() {
 
 // ---------- Form ----------
 
-function updateSummary() {
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.mode === m)));
+  $('startLabel').textContent = m === 'feed' ? 'Start of feed' : 'Time';
+  $('feedFields').hidden = m !== 'feed';
+  $('diaperFields').hidden = m !== 'diaper';
+  $('saveBtn').textContent = `${editingId ? 'Update' : 'Save'} ${m}`;
+  updateForm();
+}
+
+function updateForm() {
   const startVal = $('start').value;
+  if (mode === 'diaper') {
+    $('saveBtn').disabled = !startVal || !(pressed('peeBtn') || pressed('poopBtn'));
+    return;
+  }
   const total = minutes('left') + minutes('right');
   if (!startVal) {
     $('summary').innerHTML = 'Pick a start time';
@@ -471,109 +568,138 @@ function resetForm() {
   $('start').value = toLocalInput(new Date());
   $('left').value = 0;
   $('right').value = 0;
-  $('saveBtn').textContent = 'Save feed';
+  setPressed('peeBtn', false);
+  setPressed('poopBtn', false);
   $('cancelBtn').hidden = true;
-  updateSummary();
+  setMode(mode);
   render();
 }
 
 function save() {
   const startVal = $('start').value;
   if (!startVal) return;
-  const entry = {
+  const common = {
     id: editingId || `local-${crypto.randomUUID?.() || Date.now()}`,
+    type: mode,
     start: new Date(startVal).toISOString(),
-    left: minutes('left'),
-    right: minutes('right'),
   };
-  if (entry.left + entry.right === 0) return;
+  const entry = mode === 'feed'
+    ? { ...common, left: minutes('left'), right: minutes('right') }
+    : { ...common, pee: pressed('peeBtn'), poop: pressed('poopBtn') };
+  if (mode === 'feed' ? entry.left + entry.right === 0 : !(entry.pee || entry.poop)) return;
   if (editingId) {
     entry.pending = !isLocal(entry);
-    feeds = feeds.map((f) => (f.id === editingId ? entry : f));
+    entries = entries.map((e) => (e.id === editingId ? entry : e));
   } else {
-    feeds.push(entry);
+    entries.push(entry);
   }
-  sortFeeds();
+  sortEntries();
   persist();
   resetForm();
   sync();
 }
 
 function edit(id) {
-  const f = feeds.find((x) => x.id === id);
-  if (!f) return;
+  const e = entries.find((x) => x.id === id);
+  if (!e) return;
+  resetForm();
   editingId = id;
-  $('start').value = toLocalInput(new Date(f.start));
-  $('left').value = f.left;
-  $('right').value = f.right;
-  $('saveBtn').textContent = 'Update feed';
+  $('start').value = toLocalInput(new Date(e.start));
+  if (e.type === 'feed') {
+    $('left').value = e.left;
+    $('right').value = e.right;
+  } else {
+    setPressed('peeBtn', e.pee);
+    setPressed('poopBtn', e.poop);
+  }
   $('cancelBtn').hidden = false;
-  updateSummary();
+  setMode(e.type);
   render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function remove(id) {
-  const f = feeds.find((x) => x.id === id);
-  if (!f) return;
-  if (!confirm(`Delete feed at ${fmtTime(new Date(f.start))}?`)) return;
-  feeds = feeds.filter((x) => x.id !== id);
-  if (!isLocal(f)) deleted.push(id);
+  const e = entries.find((x) => x.id === id);
+  if (!e) return;
+  if (!confirm(`Delete ${e.type} at ${fmtTime(new Date(e.start))}?`)) return;
+  entries = entries.filter((x) => x.id !== id);
+  if (!isLocal(e)) deleted.push({ id, type: e.type });
   persist();
   if (editingId === id) resetForm(); else render();
   sync();
 }
 
+function daySummary(list) {
+  const feeds = list.filter((e) => e.type === 'feed');
+  const diapers = list.filter((e) => e.type === 'diaper');
+  const parts = [];
+  if (feeds.length) {
+    const totalMin = feeds.reduce((s, f) => s + f.left + f.right, 0);
+    parts.push(`${plural(feeds.length, 'feed')} &middot; ${totalMin} min`);
+  }
+  if (diapers.length) {
+    const pee = diapers.filter((d) => d.pee).length;
+    const poop = diapers.filter((d) => d.poop).length;
+    parts.push(`${plural(diapers.length, 'diaper')} &middot; ${pee} pee &middot; ${poop} poop`);
+  }
+  return parts.join('<br>');
+}
+
+function entryHtml(e) {
+  const pending = isLocal(e) || e.pending ? ' <span class="pending" title="Not synced yet">•</span>' : '';
+  const [time, detail] = e.type === 'feed'
+    ? [`${fmtTime(new Date(e.start))} – ${fmtTime(endOf(e))}`,
+       `L ${e.left} min &middot; R ${e.right} min &middot; ${e.left + e.right} min total`]
+    : [`${fmtTime(new Date(e.start))} <span class="tag">Diaper</span>`, diaperLabel(e)];
+  return `
+    <li data-id="${e.id}" class="${e.id === editingId ? 'editing' : ''}">
+      <div class="info">
+        <div class="time">${time}${pending}</div>
+        <div class="detail">${detail}</div>
+      </div>
+      <button class="del" aria-label="Delete">&times;</button>
+    </li>`;
+}
+
 function render() {
   renderStatus();
   const container = $('history');
-  if (feeds.length === 0) {
-    container.innerHTML = '<div class="card empty">No feeds logged yet</div>';
+  if (entries.length === 0) {
+    container.innerHTML = '<div class="card empty">Nothing logged yet</div>';
     return;
   }
   const groups = new Map();
-  for (const f of feeds) {
-    const key = new Date(f.start).toDateString();
+  for (const e of entries) {
+    const key = new Date(e.start).toDateString();
     if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(f);
+    groups.get(key).push(e);
   }
   container.innerHTML = '';
   for (const [key, list] of groups) {
-    const totalMin = list.reduce((s, f) => s + f.left + f.right, 0);
     const card = document.createElement('section');
     card.className = 'card';
     card.innerHTML = `
       <div class="day-head">
         <h2>${fmtDay(new Date(key))}</h2>
-        <span>${list.length} feed${list.length === 1 ? '' : 's'} &middot; ${totalMin} min</span>
+        <span>${daySummary(list)}</span>
       </div>
-      <ul>${list.map((f) => `
-        <li data-id="${f.id}" class="${f.id === editingId ? 'editing' : ''}">
-          <div class="info">
-            <div class="time">${fmtTime(new Date(f.start))} – ${fmtTime(endOf(f))}${
-              isLocal(f) || f.pending ? ' <span class="pending" title="Not synced yet">•</span>' : ''}</div>
-            <div class="detail">L ${f.left} min &middot; R ${f.right} min &middot; ${f.left + f.right} min total</div>
-          </div>
-          <button class="del" aria-label="Delete">&times;</button>
-        </li>`).join('')}
-      </ul>`;
+      <ul>${list.map(entryHtml).join('')}</ul>`;
     container.appendChild(card);
   }
 }
 
 function exportCsv() {
-  const rows = [['start', 'end', 'left_min', 'right_min', 'total_min']];
-  for (const f of [...feeds].reverse()) {
-    rows.push([
-      toLocalInput(new Date(f.start)).replace('T', ' '),
-      toLocalInput(endOf(f)).replace('T', ' '),
-      f.left, f.right, f.left + f.right,
-    ]);
+  const fmt = (d) => toLocalInput(d).replace('T', ' ');
+  const rows = [['type', 'start', 'end', 'left_min', 'right_min', 'total_min', 'pee', 'poop']];
+  for (const e of [...entries].reverse()) {
+    rows.push(e.type === 'feed'
+      ? ['feed', fmt(new Date(e.start)), fmt(endOf(e)), e.left, e.right, e.left + e.right, '', '']
+      : ['diaper', fmt(new Date(e.start)), '', '', '', '', e.pee ? 1 : 0, e.poop ? 1 : 0]);
   }
   const blob = new Blob([rows.map((r) => r.join(',')).join('\n')], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `feeds-${toLocalInput(new Date()).slice(0, 10)}.csv`;
+  a.download = `feed-log-${toLocalInput(new Date()).slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -611,12 +737,20 @@ document.querySelectorAll('button[data-step]').forEach((btn) => {
   btn.addEventListener('click', () => {
     const id = btn.dataset.target;
     $(id).value = Math.max(0, Math.min(180, minutes(id) + Number(btn.dataset.step)));
-    updateSummary();
+    updateForm();
   });
 });
-['start', 'left', 'right'].forEach((id) => $(id).addEventListener('input', updateSummary));
+document.querySelectorAll('.tabs button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.mode === mode) return;
+    mode = btn.dataset.mode;
+    if (editingId) resetForm(); else setMode(mode);
+  });
+});
+['peeBtn', 'poopBtn'].forEach((id) => $(id).addEventListener('click', () => { setPressed(id, !pressed(id)); updateForm(); }));
+['start', 'left', 'right'].forEach((id) => $(id).addEventListener('input', updateForm));
 ['left', 'right'].forEach((id) => $(id).addEventListener('focus', (e) => e.target.select()));
-$('nowBtn').addEventListener('click', () => { $('start').value = toLocalInput(new Date()); updateSummary(); });
+$('nowBtn').addEventListener('click', () => { $('start').value = toLocalInput(new Date()); updateForm(); });
 $('saveBtn').addEventListener('click', save);
 $('cancelBtn').addEventListener('click', resetForm);
 $('exportBtn').addEventListener('click', exportCsv);

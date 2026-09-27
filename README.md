@@ -1,13 +1,17 @@
 # Feed Log
 
-A simple installable web app for logging newborn breastfeeding: start time, minutes per side, and the resulting end time.
+A simple installable web app for logging newborn breastfeeding (start time, minutes per side, and the resulting end
+time) and diapers (time, pee and/or poop).
 
 Live: https://joho9119.github.io/feed-tracker/
 
 ## Sync
 
-Feeds sync between phones through an Airtable base with a **Feeds** table (fields **Start** as date/time,
-**Left** and **Right** as numbers). Tap the sync status in the top-right corner and enter the base ID (or paste any
+Entries sync between phones through an Airtable base with two tables:
+
+- **Feeds**: **Start** (date/time), **Left** and **Right** (numbers, minutes)
+- **Diapers**: **Time** (date/time), **Pee** and **Poop** (checkboxes)
+ Tap the sync status in the top-right corner and enter the base ID (or paste any
 Airtable link to the base) plus a personal access token with `data.records:read` and `data.records:write` scoped to
 that base. Both are stored only on the device.
 
