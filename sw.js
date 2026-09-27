@@ -1,6 +1,6 @@
 // Network-first for the app's own files so updates show up right away, with
 // the cache as the offline fallback. Airtable API calls are never intercepted.
-const CACHE = 'feed-log-v8';
+const CACHE = 'feed-log-v9';
 const FILES = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

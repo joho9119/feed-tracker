@@ -354,9 +354,24 @@
 const TYPES = {
   feed: {
     table: 'Feeds',
-    fields: ['Start', 'Left', 'Right'],
-    toFields: (e) => ({ Start: e.start, Left: e.left, Right: e.right }),
-    fromFields: (f) => ({ start: f.Start, left: f.Left || 0, right: f.Right || 0 }),
+    fields: ['Start', 'Left', 'Right', 'Left duration', 'Right duration'],
+    // Durations hold exact seconds; Left/Right keep the displayed minutes so
+    // the spreadsheet stays readable.
+    toFields: (e) => ({
+      Start: e.start,
+      Left: toMin(e.leftSec),
+      Right: toMin(e.rightSec),
+      'Left duration': e.leftSec,
+      'Right duration': e.rightSec,
+    }),
+    fromFields: (f) => {
+      const hasDuration = f['Left duration'] != null || f['Right duration'] != null;
+      return {
+        start: f.Start,
+        leftSec: hasDuration ? f['Left duration'] || 0 : (f.Left || 0) * 60,
+        rightSec: hasDuration ? f['Right duration'] || 0 : (f.Right || 0) * 60,
+      };
+    },
   },
   diaper: {
     table: 'Diapers',
@@ -371,8 +386,7 @@ const TIMER_MAX_MIN = 120;
 const K = { entries: 'feeds.v1', deleted: 'feeds.deleted', token: 'airtable.token', base: 'airtable.base', draft: 'feeds.draft' };
 const $ = (id) => document.getElementById(id);
 
-// Entries saved before diapers existed have no type; deletes were bare ids.
-let entries = loadJson(K.entries, []).map((e) => ({ type: 'feed', ...e }));
+let entries = loadJson(K.entries, []).map(migrateEntry);
 let deleted = loadJson(K.deleted, []).map((d) => (typeof d === 'string' ? { id: d, type: 'feed' } : d));
 let token = localStorage.getItem(K.token) || '';
 let base = localStorage.getItem(K.base) || '';
@@ -380,6 +394,15 @@ let mode = 'feed';
 let editingId = null;
 let editingType = null;
 let sync_ = { running: false, again: false, state: 'idle', at: null };
+
+// Older saved entries have no type (pre-diapers) or whole minutes instead of
+// seconds; deletes used to be bare ids.
+function migrateEntry(e) {
+  const entry = { type: 'feed', ...e };
+  if (entry.type !== 'feed' || entry.leftSec !== undefined) return entry;
+  const { left = 0, right = 0, ...rest } = entry;
+  return { ...rest, leftSec: left * 60, rightSec: right * 60 };
+}
 
 function loadJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) || fallback; }
@@ -402,6 +425,20 @@ function toLocalInput(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+const MAX_SIDE_SEC = 180 * 60;
+
+// Seconds shown as whole minutes: nearest minute, but anything under a
+// minute shows as 1.
+const toMin = (sec) => (sec <= 0 ? 0 : sec < 60 ? 1 : Math.round(sec / 60));
+
+// Exact seconds per side for the feed form; the inputs show toMin() of these.
+const sideSec = { left: 0, right: 0 };
+
+function setSide(side, sec) {
+  sideSec[side] = Math.max(0, Math.min(MAX_SIDE_SEC, Math.round(sec)));
+  $(side).value = toMin(sideSec[side]);
+}
+
 function minutes(id) {
   const n = Math.round(Number($(id).value));
   return Number.isFinite(n) && n > 0 ? Math.min(n, 180) : 0;
@@ -411,7 +448,7 @@ const pressed = (id) => $(id).getAttribute('aria-pressed') === 'true';
 const setPressed = (id, on) => $(id).setAttribute('aria-pressed', String(on));
 
 function endOf(feed) {
-  return new Date(new Date(feed.start).getTime() + (feed.left + feed.right) * 60000);
+  return new Date(new Date(feed.start).getTime() + (feed.leftSec + feed.rightSec) * 1000);
 }
 
 function diaperLabel(e) {
@@ -578,8 +615,7 @@ let timerNote = '';
 
 // Elapsed time on the running timer, capped at TIMER_MAX_MIN.
 const runningMs = () => (timer ? Math.min(Date.now() - timer.since, TIMER_MAX_MIN * 60000) : 0);
-// Nearest minute, except a run under one minute still counts as 1.
-const runningMinutes = () => (timer ? Math.max(1, Math.round(runningMs() / 60000)) : 0);
+const runningSec = () => Math.round(runningMs() / 1000);
 const fmtElapsed = (ms) => {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -589,7 +625,7 @@ const editingCurrent = () => !!editingId && editingType === mode;
 function saveDraft() {
   if (!draftActive) return localStorage.removeItem(K.draft);
   localStorage.setItem(K.draft, JSON.stringify({
-    start: $('feedStart').value, left: minutes('left'), right: minutes('right'), timer,
+    start: $('feedStart').value, leftSec: sideSec.left, rightSec: sideSec.right, timer,
   }));
 }
 
@@ -597,8 +633,8 @@ function restoreDraft() {
   const d = loadJson(K.draft, null);
   if (!d) return false;
   $('feedStart').value = d.start;
-  $('left').value = d.left;
-  $('right').value = d.right;
+  setSide('left', d.leftSec ?? (d.left || 0) * 60);
+  setSide('right', d.rightSec ?? (d.right || 0) * 60);
   timer = d.timer;
   draftActive = true;
   startTouched = true;
@@ -618,7 +654,7 @@ function enforceTimerLimit() {
 function stopTimer() {
   if (!timer) return;
   const side = timer.side;
-  $(side).value = Math.min(180, minutes(side) + runningMinutes());
+  setSide(side, sideSec[side] + runningSec());
   timer = null;
   saveDraft();
   updateForm();
@@ -628,7 +664,7 @@ function toggleTimer(side) {
   const wasRunning = timer?.side;
   stopTimer();
   if (wasRunning === side) return;
-  if (!draftActive && !startTouched && minutes('left') + minutes('right') === 0) {
+  if (!draftActive && !startTouched && sideSec.left + sideSec.right === 0) {
     $('feedStart').value = toLocalInput(new Date());
   }
   timer = { side, since: Date.now() };
@@ -666,16 +702,16 @@ function updateForm() {
     return;
   }
   const startVal = $('feedStart').value;
-  const total = minutes('left') + minutes('right') + runningMinutes();
+  const totalSec = sideSec.left + sideSec.right + runningSec();
   if (!startVal) {
     $('summary').innerHTML = 'Pick a start time';
     $('saveBtn').disabled = true;
     return;
   }
-  const end = new Date(new Date(startVal).getTime() + total * 60000);
-  $('summary').innerHTML = `Total <strong>${total} min</strong> &middot; Ends <strong>${fmtTime(end)}</strong>`
+  const end = new Date(new Date(startVal).getTime() + totalSec * 1000);
+  $('summary').innerHTML = `Total <strong>${toMin(totalSec)} min</strong> &middot; Ends <strong>${fmtTime(end)}</strong>`
     + (timerNote ? `<div class="note">${timerNote}</div>` : '');
-  $('saveBtn').disabled = total === 0;
+  $('saveBtn').disabled = totalSec === 0;
 }
 
 function resetFeed() {
@@ -685,8 +721,8 @@ function resetFeed() {
   draftActive = false;
   startTouched = false;
   $('feedStart').value = toLocalInput(new Date());
-  $('left').value = 0;
-  $('right').value = 0;
+  setSide('left', 0);
+  setSide('right', 0);
   saveDraft();
 }
 
@@ -714,9 +750,9 @@ function save() {
     start: new Date(startVal).toISOString(),
   };
   const entry = mode === 'feed'
-    ? { ...common, left: minutes('left'), right: minutes('right') }
+    ? { ...common, leftSec: sideSec.left, rightSec: sideSec.right }
     : { ...common, pee: pressed('peeBtn'), poop: pressed('poopBtn') };
-  if (mode === 'feed' ? entry.left + entry.right === 0 : !(entry.pee || entry.poop)) return;
+  if (mode === 'feed' ? entry.leftSec + entry.rightSec === 0 : !(entry.pee || entry.poop)) return;
   if (editing) {
     entry.pending = !isLocal(entry);
     entries = entries.map((e) => (e.id === editingId ? entry : e));
@@ -737,8 +773,8 @@ function edit(id) {
   if (e.type === 'feed') {
     resetFeed();
     $('feedStart').value = toLocalInput(new Date(e.start));
-    $('left').value = e.left;
-    $('right').value = e.right;
+    setSide('left', e.leftSec);
+    setSide('right', e.rightSec);
   } else {
     resetDiaper();
     $('diaperTime').value = toLocalInput(new Date(e.start));
@@ -768,7 +804,7 @@ function daySummary(list) {
   const diapers = list.filter((e) => e.type === 'diaper');
   const parts = [];
   if (feeds.length) {
-    const totalMin = feeds.reduce((s, f) => s + f.left + f.right, 0);
+    const totalMin = toMin(feeds.reduce((s, f) => s + f.leftSec + f.rightSec, 0));
     parts.push(`${plural(feeds.length, 'feed')} &middot; ${totalMin} min`);
   }
   if (diapers.length) {
@@ -783,7 +819,7 @@ function entryHtml(e) {
   const pending = isLocal(e) || e.pending ? ' <span class="pending" title="Not synced yet">•</span>' : '';
   const [time, detail] = e.type === 'feed'
     ? [`${fmtTime(new Date(e.start))} – ${fmtTime(endOf(e))}`,
-       `L ${e.left} min &middot; R ${e.right} min &middot; ${e.left + e.right} min total`]
+       `L ${toMin(e.leftSec)} min &middot; R ${toMin(e.rightSec)} min &middot; ${toMin(e.leftSec + e.rightSec)} min total`]
     : [`${fmtTime(new Date(e.start))} <span class="tag">Diaper</span>`, diaperLabel(e)];
   return `
     <li data-id="${e.id}" class="${e.id === editingId ? 'editing' : ''}">
@@ -824,11 +860,12 @@ function render() {
 
 function exportCsv() {
   const fmt = (d) => toLocalInput(d).replace('T', ' ');
-  const rows = [['type', 'start', 'end', 'left_min', 'right_min', 'total_min', 'pee', 'poop']];
+  const rows = [['type', 'start', 'end', 'left_min', 'right_min', 'total_min', 'left_sec', 'right_sec', 'pee', 'poop']];
   for (const e of [...entries].reverse()) {
     rows.push(e.type === 'feed'
-      ? ['feed', fmt(new Date(e.start)), fmt(endOf(e)), e.left, e.right, e.left + e.right, '', '']
-      : ['diaper', fmt(new Date(e.start)), '', '', '', '', e.pee ? 1 : 0, e.poop ? 1 : 0]);
+      ? ['feed', fmt(new Date(e.start)), fmt(endOf(e)), toMin(e.leftSec), toMin(e.rightSec),
+         toMin(e.leftSec + e.rightSec), e.leftSec, e.rightSec, '', '']
+      : ['diaper', fmt(new Date(e.start)), '', '', '', '', '', '', e.pee ? 1 : 0, e.poop ? 1 : 0]);
   }
   const blob = new Blob([rows.map((r) => r.join(',')).join('\n')], { type: 'text/csv' });
   const a = document.createElement('a');
@@ -870,7 +907,7 @@ function setSyncSettings(baseValue, tokenValue) {
 document.querySelectorAll('button[data-step]').forEach((btn) => {
   btn.addEventListener('click', () => {
     const id = btn.dataset.target;
-    $(id).value = Math.max(0, Math.min(180, minutes(id) + Number(btn.dataset.step)));
+    setSide(id, sideSec[id] + Number(btn.dataset.step) * 60);
     saveDraft();
     updateForm();
   });
@@ -893,7 +930,13 @@ document.querySelectorAll('.tabs button').forEach((btn) => {
 });
 ['peeBtn', 'poopBtn'].forEach((id) => $(id).addEventListener('click', () => { setPressed(id, !pressed(id)); updateForm(); }));
 $('feedStart').addEventListener('input', () => { startTouched = true; saveDraft(); updateForm(); });
-['diaperTime', 'left', 'right'].forEach((id) => $(id).addEventListener('input', () => { saveDraft(); updateForm(); }));
+$('diaperTime').addEventListener('input', updateForm);
+// Typing a number replaces that side's exact seconds with whole minutes.
+['left', 'right'].forEach((id) => $(id).addEventListener('input', () => {
+  sideSec[id] = minutes(id) * 60;
+  saveDraft();
+  updateForm();
+}));
 ['left', 'right'].forEach((id) => $(id).addEventListener('focus', (e) => e.target.select()));
 $('saveBtn').addEventListener('click', save);
 $('cancelBtn').addEventListener('click', () => {
