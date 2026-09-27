@@ -119,18 +119,20 @@
     color: var(--text);
     border: 1px solid var(--border);
   }
-  .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .sides { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 16px; }
   .side { text-align: center; }
-  .stepper { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .stepper { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
   .stepper button {
-    width: 44px; height: 44px;
+    width: 42px; height: 44px;
+    flex: none;
     font-size: 22px;
     background: var(--bg);
     color: var(--accent-dark);
     border: 1px solid var(--border);
   }
   .stepper input {
-    width: 56px;
+    width: 48px;
+    min-width: 0;
     font-family: inherit;
     font-size: 24px;
     font-weight: 600;
@@ -143,6 +145,14 @@
   .stepper input::-webkit-outer-spin-button,
   .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .unit { font-size: 12px; color: var(--muted); }
+  .quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
+  .quick button {
+    padding: 8px 0;
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--accent-dark);
+    border: 1px solid var(--border);
+  }
   .summary {
     margin: 16px 0;
     padding: 12px;
@@ -203,6 +213,12 @@
           <button type="button" data-target="left" data-step="1" aria-label="Left plus one">+</button>
         </div>
         <div class="unit">min</div>
+        <div class="quick">
+          <button type="button" data-target="left" data-step="-30">−30</button>
+          <button type="button" data-target="left" data-step="-15">−15</button>
+          <button type="button" data-target="left" data-step="15">+15</button>
+          <button type="button" data-target="left" data-step="30">+30</button>
+        </div>
       </div>
       <div class="side">
         <label class="field" for="right">Right</label>
@@ -212,6 +228,12 @@
           <button type="button" data-target="right" data-step="1" aria-label="Right plus one">+</button>
         </div>
         <div class="unit">min</div>
+        <div class="quick">
+          <button type="button" data-target="right" data-step="-30">−30</button>
+          <button type="button" data-target="right" data-step="-15">−15</button>
+          <button type="button" data-target="right" data-step="15">+15</button>
+          <button type="button" data-target="right" data-step="30">+30</button>
+        </div>
       </div>
     </div>
 
@@ -585,7 +607,7 @@ function setSyncSettings(baseValue, tokenValue) {
 
 // ---------- Wiring ----------
 
-document.querySelectorAll('.stepper button').forEach((btn) => {
+document.querySelectorAll('button[data-step]').forEach((btn) => {
   btn.addEventListener('click', () => {
     const id = btn.dataset.target;
     $(id).value = Math.max(0, Math.min(180, minutes(id) + Number(btn.dataset.step)));
