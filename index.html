@@ -219,6 +219,7 @@
     text-align: center;
   }
   .summary strong { font-size: 18px; }
+  .summary .note { margin-top: 4px; font-size: 13px; color: var(--accent-dark); }
   .btn-primary {
     width: 100%;
     padding: 14px;
@@ -366,6 +367,7 @@ const TYPES = {
 };
 const SYNC_DAYS = 30;
 const POLL_MS = 30000;
+const TIMER_MAX_MIN = 120;
 const K = { entries: 'feeds.v1', deleted: 'feeds.deleted', token: 'airtable.token', base: 'airtable.base', draft: 'feeds.draft' };
 const $ = (id) => document.getElementById(id);
 
@@ -572,7 +574,11 @@ let timer = null; // { side: 'left' | 'right', since: epoch ms }
 let draftActive = false;
 let startTouched = false;
 
-const runningMinutes = () => (timer ? Math.round((Date.now() - timer.since) / 60000) : 0);
+let timerNote = '';
+
+// Elapsed time on the running timer, capped at TIMER_MAX_MIN.
+const runningMs = () => (timer ? Math.min(Date.now() - timer.since, TIMER_MAX_MIN * 60000) : 0);
+const runningMinutes = () => Math.round(runningMs() / 60000);
 const fmtElapsed = (ms) => {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -598,6 +604,16 @@ function restoreDraft() {
   return true;
 }
 
+// Stops a timer that has hit the cap, including one left running while the
+// app was closed.
+function enforceTimerLimit() {
+  if (!timer || Date.now() - timer.since < TIMER_MAX_MIN * 60000) return;
+  const side = timer.side;
+  stopTimer();
+  timerNote = `${side === 'left' ? 'Left' : 'Right'} timer stopped automatically at ${TIMER_MAX_MIN} min`;
+  updateForm();
+}
+
 function stopTimer() {
   if (!timer) return;
   const side = timer.side;
@@ -615,6 +631,7 @@ function toggleTimer(side) {
     $('feedStart').value = toLocalInput(new Date());
   }
   timer = { side, since: Date.now() };
+  timerNote = '';
   draftActive = true;
   saveDraft();
   updateForm();
@@ -624,7 +641,7 @@ function renderTimers() {
   document.querySelectorAll('.timer').forEach((btn) => {
     const running = timer?.side === btn.dataset.side;
     btn.classList.toggle('running', running);
-    btn.textContent = running ? `■ ${fmtElapsed(Date.now() - timer.since)}` : '▶ Start timer';
+    btn.textContent = running ? `■ ${fmtElapsed(runningMs())}` : '▶ Start timer';
     btn.disabled = editingType === 'feed';
   });
   $('feedTab').classList.toggle('running', !!timer);
@@ -655,13 +672,15 @@ function updateForm() {
     return;
   }
   const end = new Date(new Date(startVal).getTime() + total * 60000);
-  $('summary').innerHTML = `Total <strong>${total} min</strong> &middot; Ends <strong>${fmtTime(end)}</strong>`;
+  $('summary').innerHTML = `Total <strong>${total} min</strong> &middot; Ends <strong>${fmtTime(end)}</strong>`
+    + (timerNote ? `<div class="note">${timerNote}</div>` : '');
   $('saveBtn').disabled = total === 0;
 }
 
 function resetFeed() {
   if (editingType === 'feed') { editingId = null; editingType = null; }
   timer = null;
+  timerNote = '';
   draftActive = false;
   startTouched = false;
   $('feedStart').value = toLocalInput(new Date());
@@ -895,10 +914,11 @@ $('closeSettingsBtn').addEventListener('click', () => $('settings').close());
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
 window.addEventListener('online', sync);
 setInterval(() => { if (document.visibilityState === 'visible') sync(); }, POLL_MS);
-setInterval(() => { if (timer) updateForm(); }, 1000);
+setInterval(() => { if (timer) { enforceTimerLimit(); updateForm(); } }, 1000);
 
 if (!restoreDraft()) resetFeed();
 resetDiaper();
+enforceTimerLimit();
 setMode('feed');
 render();
 sync();
