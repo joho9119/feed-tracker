@@ -3,6 +3,9 @@
 A simple installable web app for logging newborn breastfeeding (start time, minutes per side, and the resulting end
 time) and diapers (time, pee and/or poop).
 
+Each side has a live timer: tap to start, tap again to stop and add the elapsed minutes to that side. A feed in
+progress is saved on the device, so the timer survives the phone locking or the app being closed.
+
 Live: https://joho9119.github.io/feed-tracker/
 
 ## Sync

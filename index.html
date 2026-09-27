@@ -107,7 +107,7 @@
   }
   .tabs button { padding: 8px; background: none; color: var(--muted); font-weight: 600; }
   .tabs button[aria-selected=true] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
-  .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
   .toggle {
     padding: 20px 0;
     font-size: 18px;
@@ -130,7 +130,7 @@
     margin-bottom: 16px;
   }
   label.field { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-  .row { display: flex; gap: 8px; align-items: center; }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
   input[type=datetime-local] {
     flex: 1;
     min-width: 0;
@@ -154,7 +154,30 @@
     color: var(--text);
     border: 1px solid var(--border);
   }
-  .sides { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 16px; }
+  .timer {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px 0;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    background: var(--bg);
+    color: var(--accent-dark);
+    border: 1px solid var(--border);
+  }
+  .timer.running { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .timer:disabled { opacity: .4; }
+  .tabs button.running::after {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    margin-left: 6px;
+    border-radius: 50%;
+    vertical-align: 1px;
+    background: var(--accent);
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .sides { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
   .side { text-align: center; }
   .stepper { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
   .stepper button {
@@ -234,17 +257,16 @@
 
   <section class="card">
     <div class="tabs" role="tablist">
-      <button type="button" role="tab" data-mode="feed">Feed</button>
+      <button type="button" role="tab" data-mode="feed" id="feedTab">Feed</button>
       <button type="button" role="tab" data-mode="diaper">Diaper</button>
     </div>
 
-    <label class="field" for="start" id="startLabel">Start of feed</label>
-    <div class="row">
-      <input type="datetime-local" id="start">
-      <button class="btn-secondary" id="nowBtn" type="button">Now</button>
-    </div>
-
     <div id="feedFields">
+      <label class="field" for="feedStart">Start of feed</label>
+      <div class="row">
+        <input type="datetime-local" id="feedStart">
+        <button class="btn-secondary" type="button" data-now="feedStart">Now</button>
+      </div>
       <div class="sides">
         <div class="side">
           <label class="field" for="left">Left</label>
@@ -260,6 +282,7 @@
             <button type="button" data-target="left" data-step="15">+15</button>
             <button type="button" data-target="left" data-step="30">+30</button>
           </div>
+          <button type="button" class="timer" data-side="left"></button>
         </div>
         <div class="side">
           <label class="field" for="right">Right</label>
@@ -275,12 +298,18 @@
             <button type="button" data-target="right" data-step="15">+15</button>
             <button type="button" data-target="right" data-step="30">+30</button>
           </div>
+          <button type="button" class="timer" data-side="right"></button>
         </div>
       </div>
       <div class="summary" id="summary"></div>
     </div>
 
     <div id="diaperFields" hidden>
+      <label class="field" for="diaperTime">Time</label>
+      <div class="row">
+        <input type="datetime-local" id="diaperTime">
+        <button class="btn-secondary" type="button" data-now="diaperTime">Now</button>
+      </div>
       <div class="toggles">
         <button type="button" class="toggle" id="peeBtn" aria-pressed="false">Pee</button>
         <button type="button" class="toggle" id="poopBtn" aria-pressed="false">Poop</button>
@@ -337,7 +366,7 @@ const TYPES = {
 };
 const SYNC_DAYS = 30;
 const POLL_MS = 30000;
-const K = { entries: 'feeds.v1', deleted: 'feeds.deleted', token: 'airtable.token', base: 'airtable.base' };
+const K = { entries: 'feeds.v1', deleted: 'feeds.deleted', token: 'airtable.token', base: 'airtable.base', draft: 'feeds.draft' };
 const $ = (id) => document.getElementById(id);
 
 // Entries saved before diapers existed have no type; deletes were bare ids.
@@ -347,6 +376,7 @@ let token = localStorage.getItem(K.token) || '';
 let base = localStorage.getItem(K.base) || '';
 let mode = 'feed';
 let editingId = null;
+let editingType = null;
 let sync_ = { running: false, again: false, state: 'idle', at: null };
 
 function loadJson(key, fallback) {
@@ -535,24 +565,90 @@ function renderStatus() {
 }
 
 // ---------- Form ----------
+// While a side timer is in use the feed form is a draft that is persisted,
+// so it survives the phone locking or the app being closed mid-feed.
+
+let timer = null; // { side: 'left' | 'right', since: epoch ms }
+let draftActive = false;
+let startTouched = false;
+
+const runningMinutes = () => (timer ? Math.round((Date.now() - timer.since) / 60000) : 0);
+const fmtElapsed = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+const editingCurrent = () => !!editingId && editingType === mode;
+
+function saveDraft() {
+  if (!draftActive) return localStorage.removeItem(K.draft);
+  localStorage.setItem(K.draft, JSON.stringify({
+    start: $('feedStart').value, left: minutes('left'), right: minutes('right'), timer,
+  }));
+}
+
+function restoreDraft() {
+  const d = loadJson(K.draft, null);
+  if (!d) return false;
+  $('feedStart').value = d.start;
+  $('left').value = d.left;
+  $('right').value = d.right;
+  timer = d.timer;
+  draftActive = true;
+  startTouched = true;
+  return true;
+}
+
+function stopTimer() {
+  if (!timer) return;
+  const side = timer.side;
+  $(side).value = Math.min(180, minutes(side) + runningMinutes());
+  timer = null;
+  saveDraft();
+  updateForm();
+}
+
+function toggleTimer(side) {
+  const wasRunning = timer?.side;
+  stopTimer();
+  if (wasRunning === side) return;
+  if (!draftActive && !startTouched && minutes('left') + minutes('right') === 0) {
+    $('feedStart').value = toLocalInput(new Date());
+  }
+  timer = { side, since: Date.now() };
+  draftActive = true;
+  saveDraft();
+  updateForm();
+}
+
+function renderTimers() {
+  document.querySelectorAll('.timer').forEach((btn) => {
+    const running = timer?.side === btn.dataset.side;
+    btn.classList.toggle('running', running);
+    btn.textContent = running ? `■ ${fmtElapsed(Date.now() - timer.since)}` : '▶ Start timer';
+    btn.disabled = editingType === 'feed';
+  });
+  $('feedTab').classList.toggle('running', !!timer);
+}
 
 function setMode(m) {
   mode = m;
   document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.mode === m)));
-  $('startLabel').textContent = m === 'feed' ? 'Start of feed' : 'Time';
   $('feedFields').hidden = m !== 'feed';
   $('diaperFields').hidden = m !== 'diaper';
-  $('saveBtn').textContent = `${editingId ? 'Update' : 'Save'} ${m}`;
   updateForm();
 }
 
 function updateForm() {
-  const startVal = $('start').value;
+  $('saveBtn').textContent = `${editingCurrent() ? 'Update' : 'Save'} ${mode}`;
+  $('cancelBtn').textContent = editingCurrent() ? 'Cancel edit' : 'Discard';
+  $('cancelBtn').hidden = !(editingCurrent() || (mode === 'feed' && draftActive));
+  renderTimers();
   if (mode === 'diaper') {
-    $('saveBtn').disabled = !startVal || !(pressed('peeBtn') || pressed('poopBtn'));
+    $('saveBtn').disabled = !$('diaperTime').value || !(pressed('peeBtn') || pressed('poopBtn'));
     return;
   }
-  const total = minutes('left') + minutes('right');
+  const startVal = $('feedStart').value;
+  const total = minutes('left') + minutes('right') + runningMinutes();
   if (!startVal) {
     $('summary').innerHTML = 'Pick a start time';
     $('saveBtn').disabled = true;
@@ -563,23 +659,37 @@ function updateForm() {
   $('saveBtn').disabled = total === 0;
 }
 
-function resetForm() {
-  editingId = null;
-  $('start').value = toLocalInput(new Date());
+function resetFeed() {
+  if (editingType === 'feed') { editingId = null; editingType = null; }
+  timer = null;
+  draftActive = false;
+  startTouched = false;
+  $('feedStart').value = toLocalInput(new Date());
   $('left').value = 0;
   $('right').value = 0;
+  saveDraft();
+}
+
+function resetDiaper() {
+  if (editingType === 'diaper') { editingId = null; editingType = null; }
+  $('diaperTime').value = toLocalInput(new Date());
   setPressed('peeBtn', false);
   setPressed('poopBtn', false);
-  $('cancelBtn').hidden = true;
-  setMode(mode);
+}
+
+function resetForm(type) {
+  if (type === 'feed') resetFeed(); else resetDiaper();
+  updateForm();
   render();
 }
 
 function save() {
-  const startVal = $('start').value;
+  if (mode === 'feed') stopTimer();
+  const startVal = $(mode === 'feed' ? 'feedStart' : 'diaperTime').value;
   if (!startVal) return;
+  const editing = editingCurrent();
   const common = {
-    id: editingId || `local-${crypto.randomUUID?.() || Date.now()}`,
+    id: editing ? editingId : `local-${crypto.randomUUID?.() || Date.now()}`,
     type: mode,
     start: new Date(startVal).toISOString(),
   };
@@ -587,7 +697,7 @@ function save() {
     ? { ...common, left: minutes('left'), right: minutes('right') }
     : { ...common, pee: pressed('peeBtn'), poop: pressed('poopBtn') };
   if (mode === 'feed' ? entry.left + entry.right === 0 : !(entry.pee || entry.poop)) return;
-  if (editingId) {
+  if (editing) {
     entry.pending = !isLocal(entry);
     entries = entries.map((e) => (e.id === editingId ? entry : e));
   } else {
@@ -595,24 +705,28 @@ function save() {
   }
   sortEntries();
   persist();
-  resetForm();
+  resetForm(mode);
   sync();
 }
 
 function edit(id) {
   const e = entries.find((x) => x.id === id);
   if (!e) return;
-  resetForm();
-  editingId = id;
-  $('start').value = toLocalInput(new Date(e.start));
+  if (e.type === 'feed' && draftActive && !confirm('Discard the feed in progress?')) return;
+  if (editingType) resetForm(editingType);
   if (e.type === 'feed') {
+    resetFeed();
+    $('feedStart').value = toLocalInput(new Date(e.start));
     $('left').value = e.left;
     $('right').value = e.right;
   } else {
+    resetDiaper();
+    $('diaperTime').value = toLocalInput(new Date(e.start));
     setPressed('peeBtn', e.pee);
     setPressed('poopBtn', e.poop);
   }
-  $('cancelBtn').hidden = false;
+  editingId = id;
+  editingType = e.type;
   setMode(e.type);
   render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -625,7 +739,7 @@ function remove(id) {
   entries = entries.filter((x) => x.id !== id);
   if (!isLocal(e)) deleted.push({ id, type: e.type });
   persist();
-  if (editingId === id) resetForm(); else render();
+  if (editingId === id) resetForm(e.type); else render();
   sync();
 }
 
@@ -737,22 +851,35 @@ document.querySelectorAll('button[data-step]').forEach((btn) => {
   btn.addEventListener('click', () => {
     const id = btn.dataset.target;
     $(id).value = Math.max(0, Math.min(180, minutes(id) + Number(btn.dataset.step)));
+    saveDraft();
     updateForm();
   });
 });
+document.querySelectorAll('button[data-now]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    $(btn.dataset.now).value = toLocalInput(new Date());
+    if (btn.dataset.now === 'feedStart') startTouched = true;
+    saveDraft();
+    updateForm();
+  });
+});
+document.querySelectorAll('.timer').forEach((btn) => btn.addEventListener('click', () => toggleTimer(btn.dataset.side)));
 document.querySelectorAll('.tabs button').forEach((btn) => {
   btn.addEventListener('click', () => {
     if (btn.dataset.mode === mode) return;
-    mode = btn.dataset.mode;
-    if (editingId) resetForm(); else setMode(mode);
+    if (editingType) resetForm(editingType);
+    setMode(btn.dataset.mode);
   });
 });
 ['peeBtn', 'poopBtn'].forEach((id) => $(id).addEventListener('click', () => { setPressed(id, !pressed(id)); updateForm(); }));
-['start', 'left', 'right'].forEach((id) => $(id).addEventListener('input', updateForm));
+$('feedStart').addEventListener('input', () => { startTouched = true; saveDraft(); updateForm(); });
+['diaperTime', 'left', 'right'].forEach((id) => $(id).addEventListener('input', () => { saveDraft(); updateForm(); }));
 ['left', 'right'].forEach((id) => $(id).addEventListener('focus', (e) => e.target.select()));
-$('nowBtn').addEventListener('click', () => { $('start').value = toLocalInput(new Date()); updateForm(); });
 $('saveBtn').addEventListener('click', save);
-$('cancelBtn').addEventListener('click', resetForm);
+$('cancelBtn').addEventListener('click', () => {
+  if (!editingCurrent() && !confirm('Discard this feed?')) return;
+  resetForm(mode);
+});
 $('exportBtn').addEventListener('click', exportCsv);
 $('history').addEventListener('click', (e) => {
   const li = e.target.closest('li');
@@ -768,13 +895,18 @@ $('closeSettingsBtn').addEventListener('click', () => $('settings').close());
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
 window.addEventListener('online', sync);
 setInterval(() => { if (document.visibilityState === 'visible') sync(); }, POLL_MS);
+setInterval(() => { if (timer) updateForm(); }, 1000);
 
-resetForm();
+if (!restoreDraft()) resetFeed();
+resetDiaper();
+setMode('feed');
+render();
 sync();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
+
 </body>
 </html>
