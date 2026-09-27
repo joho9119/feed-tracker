@@ -578,7 +578,8 @@ let timerNote = '';
 
 // Elapsed time on the running timer, capped at TIMER_MAX_MIN.
 const runningMs = () => (timer ? Math.min(Date.now() - timer.since, TIMER_MAX_MIN * 60000) : 0);
-const runningMinutes = () => Math.round(runningMs() / 60000);
+// Nearest minute, except a run under one minute still counts as 1.
+const runningMinutes = () => (timer ? Math.max(1, Math.round(runningMs() / 60000)) : 0);
 const fmtElapsed = (ms) => {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
