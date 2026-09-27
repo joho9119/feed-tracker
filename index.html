@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e87a90">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Feeds">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>Feed Log</title>
+<style>
+  :root {
+    --accent: #e87a90;
+    --accent-dark: #c95d74;
+    --bg: #faf6f7;
+    --card: #fff;
+    --text: #2b2326;
+    --muted: #8a7f83;
+    --border: #eadfe2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1618;
+      --card: #262023;
+      --text: #f3eced;
+      --muted: #a39599;
+      --border: #3a3135;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { max-width: 480px; margin: 0 auto; padding: 16px; }
+  header { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 16px; }
+  h1 { font-size: 22px; margin: 0; }
+  .sync {
+    background: none;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 6px 0 6px 12px;
+    text-align: right;
+  }
+  .sync::before {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    background: var(--dot, var(--muted));
+  }
+  .sync[data-state=ok] { --dot: #3aa76d; }
+  .sync[data-state=busy] { --dot: #e0a526; }
+  .sync[data-state=error] { --dot: #d9534f; color: var(--text); }
+  dialog {
+    width: min(92vw, 420px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card);
+    color: var(--text);
+    padding: 20px;
+  }
+  dialog::backdrop { background: rgb(0 0 0 / .4); }
+  dialog h2 { font-size: 18px; margin-bottom: 8px; }
+  .hint { font-size: 14px; color: var(--muted); margin: 0 0 12px; }
+  #settingsError { color: #d9534f; }
+  .setting {
+    width: 100%;
+    font: inherit;
+    padding: 10px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .dialog-actions { display: flex; gap: 8px; }
+  .dialog-actions .btn-primary { width: auto; flex: 1; padding: 10px; }
+  li .pending { color: #e0a526; }
+  h2 { font-size: 15px; margin: 0; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  label.field { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  input[type=datetime-local] {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  button {
+    font: inherit;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .btn-secondary {
+    padding: 10px 14px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .side { text-align: center; }
+  .stepper { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .stepper button {
+    width: 44px; height: 44px;
+    font-size: 22px;
+    background: var(--bg);
+    color: var(--accent-dark);
+    border: 1px solid var(--border);
+  }
+  .stepper input {
+    width: 56px;
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 600;
+    text-align: center;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    -moz-appearance: textfield;
+  }
+  .stepper input::-webkit-outer-spin-button,
+  .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .unit { font-size: 12px; color: var(--muted); }
+  .summary {
+    margin: 16px 0;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--bg);
+    text-align: center;
+  }
+  .summary strong { font-size: 18px; }
+  .btn-primary {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .btn-primary:disabled { opacity: .5; }
+  .btn-link { background: none; color: var(--muted); padding: 10px 0 0; width: 100%; }
+  .day-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .day-head span { font-size: 13px; color: var(--muted); }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+  }
+  li:first-child { border-top: none; }
+  li .info { flex: 1; cursor: pointer; }
+  li .time { font-weight: 600; }
+  li .detail { font-size: 13px; color: var(--muted); }
+  li .del { background: none; color: var(--muted); font-size: 20px; padding: 4px 8px; }
+  li.editing { background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 8px; }
+  .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+  footer { text-align: center; padding-bottom: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Feed Log</h1>
+    <button id="syncStatus" class="sync" type="button"></button>
+  </header>
+
+  <section class="card">
+    <label class="field" for="start">Start of feed</label>
+    <div class="row">
+      <input type="datetime-local" id="start">
+      <button class="btn-secondary" id="nowBtn" type="button">Now</button>
+    </div>
+
+    <div class="sides">
+      <div class="side">
+        <label class="field" for="left">Left</label>
+        <div class="stepper">
+          <button type="button" data-target="left" data-step="-1" aria-label="Left minus one">−</button>
+          <input type="number" id="left" inputmode="numeric" min="0" max="180" value="0">
+          <button type="button" data-target="left" data-step="1" aria-label="Left plus one">+</button>
+        </div>
+        <div class="unit">min</div>
+      </div>
+      <div class="side">
+        <label class="field" for="right">Right</label>
+        <div class="stepper">
+          <button type="button" data-target="right" data-step="-1" aria-label="Right minus one">−</button>
+          <input type="number" id="right" inputmode="numeric" min="0" max="180" value="0">
+          <button type="button" data-target="right" data-step="1" aria-label="Right plus one">+</button>
+        </div>
+        <div class="unit">min</div>
+      </div>
+    </div>
+
+    <div class="summary" id="summary"></div>
+
+    <button class="btn-primary" id="saveBtn" type="button">Save feed</button>
+    <button class="btn-link" id="cancelBtn" type="button" hidden>Cancel edit</button>
+  </section>
+
+  <div id="history"></div>
+
+  <footer>
+    <button class="btn-secondary" id="exportBtn" type="button">Export CSV</button>
+  </footer>
+</main>
+
+<dialog id="settings">
+  <h2>Sync with Airtable</h2>
+  <p class="hint">
+    Both phones use the same base and token. The base needs a <b>Feeds</b> table with
+    <b>Start</b>, <b>Left</b> and <b>Right</b> fields.
+  </p>
+  <label class="field" for="baseInput">Airtable base (ID or any link to it)</label>
+  <input type="text" id="baseInput" class="setting" placeholder="app…" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <label class="field" for="tokenInput">Personal access token (data.records:read + write)</label>
+  <input type="password" id="tokenInput" class="setting" placeholder="pat…" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <p class="hint" id="settingsError" hidden></p>
+  <div class="dialog-actions">
+    <button class="btn-secondary" id="removeTokenBtn" type="button">Stop syncing</button>
+    <button class="btn-secondary" id="closeSettingsBtn" type="button">Cancel</button>
+    <button class="btn-primary" id="saveTokenBtn" type="button">Save</button>
+  </div>
+</dialog>
+
+<script>
+// Feeds sync to an Airtable table. localStorage is the offline cache: new
+// feeds get a "local-" id until Airtable assigns a "rec" id, edits to synced
+// feeds are flagged `pending`, and deletes wait in a queue until pushed.
+const TABLE = 'Feeds';
+const SYNC_DAYS = 30;
+const POLL_MS = 30000;
+const K = { feeds: 'feeds.v1', deleted: 'feeds.deleted', token: 'airtable.token', base: 'airtable.base' };
+const $ = (id) => document.getElementById(id);
+
+let feeds = loadJson(K.feeds, []);
+let deleted = loadJson(K.deleted, []);
+let token = localStorage.getItem(K.token) || '';
+let base = localStorage.getItem(K.base) || '';
+let editingId = null;
+let sync_ = { running: false, again: false, state: 'idle', at: null };
+
+function loadJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) || fallback; }
+  catch { return fallback; }
+}
+
+function persist() {
+  localStorage.setItem(K.feeds, JSON.stringify(feeds));
+  localStorage.setItem(K.deleted, JSON.stringify(deleted));
+}
+
+const isLocal = (f) => !f.id.startsWith('rec');
+const unsyncedCount = () => feeds.filter((f) => isLocal(f) || f.pending).length + deleted.length;
+const sortFeeds = () => feeds.sort((a, b) => new Date(b.start) - new Date(a.start));
+
+// datetime-local needs "YYYY-MM-DDTHH:MM" in local time
+function toLocalInput(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function minutes(id) {
+  const n = Math.round(Number($(id).value));
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 180) : 0;
+}
+
+function endOf(feed) {
+  return new Date(new Date(feed.start).getTime() + (feed.left + feed.right) * 60000);
+}
+
+const fmtTime = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const fmtDay = (d) => {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const diff = Math.round((today - day) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+};
+
+// ---------- Airtable ----------
+
+async function api(path, { method = 'GET', body } = {}) {
+  const res = await fetch(`https://api.airtable.com/v0/${base}/${TABLE}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, ...(body && { 'Content-Type': 'application/json' }) },
+    body: body && JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = new Error(`Airtable ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
+const toFields = (f) => ({ Start: f.start, Left: f.left, Right: f.right });
+
+async function fetchRecent() {
+  const params = new URLSearchParams({
+    filterByFormula: `IS_AFTER({Start}, DATEADD(NOW(), -${SYNC_DAYS}, 'days'))`,
+    'sort[0][field]': 'Start',
+    'sort[0][direction]': 'desc',
+    pageSize: '100',
+  });
+  ['Start', 'Left', 'Right'].forEach((f) => params.append('fields[]', f));
+  const out = [];
+  let offset;
+  do {
+    if (offset) params.set('offset', offset);
+    const page = await api(`?${params}`);
+    for (const r of page.records) {
+      if (!r.fields.Start) continue;
+      out.push({ id: r.id, start: r.fields.Start, left: r.fields.Left || 0, right: r.fields.Right || 0 });
+    }
+    offset = page.offset;
+  } while (offset);
+  return out;
+}
+
+// A record-level 403/404/422 after the token has just been proven valid means
+// the other phone already deleted that record.
+const isGone = (err) => [403, 404, 422].includes(err.status);
+
+async function pushChanges() {
+  for (const id of [...deleted]) {
+    try { await api(`/${id}`, { method: 'DELETE' }); }
+    catch (err) { if (!isGone(err)) throw err; }
+    deleted = deleted.filter((x) => x !== id);
+    persist();
+  }
+
+  for (const f of feeds.filter((x) => !isLocal(x) && x.pending)) {
+    try {
+      await api(`/${f.id}`, { method: 'PATCH', body: { fields: toFields(f) } });
+      f.pending = false; // no-op if the user replaced this object mid-request
+    } catch (err) {
+      if (!isGone(err)) throw err;
+      feeds = feeds.filter((x) => x !== f);
+    }
+    persist();
+  }
+
+  const creates = feeds.filter(isLocal);
+  for (let i = 0; i < creates.length; i += 10) {
+    const batch = creates.slice(i, i + 10);
+    const res = await api('', { method: 'POST', body: { records: batch.map((f) => ({ fields: toFields(f) })) } });
+    batch.forEach((sent, j) => {
+      const recId = res.records[j].id;
+      const current = feeds.find((x) => x.id === sent.id);
+      if (!current) { deleted.push(recId); return; } // deleted while in flight
+      current.pending = current !== sent; // edited while in flight: push again
+      current.id = recId;
+      if (editingId === sent.id) editingId = recId;
+    });
+    persist();
+  }
+}
+
+function mergeRemote(remote) {
+  const gone = new Set(deleted);
+  const local = feeds.filter((f) => isLocal(f) || f.pending);
+  const localIds = new Set(local.map((f) => f.id));
+  feeds = [...remote.filter((r) => !gone.has(r.id) && !localIds.has(r.id)), ...local];
+  sortFeeds();
+  persist();
+}
+
+async function sync() {
+  if (!token || !base) return renderStatus();
+  if (sync_.running) { sync_.again = true; return; }
+  sync_.running = true;
+  sync_.state = 'busy';
+  renderStatus();
+  try {
+    let remote = await fetchRecent(); // also proves the token and base work
+    if (unsyncedCount() > 0) {
+      await pushChanges();
+      remote = await fetchRecent();
+    }
+    mergeRemote(remote);
+    sync_.state = 'ok';
+    sync_.at = new Date();
+  } catch (err) {
+    sync_.state = [401, 403, 404].includes(err.status) ? 'auth' : 'offline';
+  } finally {
+    sync_.running = false;
+    render();
+    if (sync_.again) { sync_.again = false; sync(); }
+  }
+}
+
+function renderStatus() {
+  const el = $('syncStatus');
+  const n = unsyncedCount();
+  const unsynced = n ? ` · ${n} unsynced` : '';
+  let text, state;
+  if (!token || !base) { text = 'Set up sync'; state = 'error'; }
+  else if (sync_.state === 'busy') { text = 'Syncing…'; state = 'busy'; }
+  else if (sync_.state === 'auth') { text = 'Check sync settings'; state = 'error'; }
+  else if (sync_.state === 'offline') { text = `Offline${unsynced}`; state = 'error'; }
+  else if (sync_.state === 'ok') { text = `Synced ${fmtTime(sync_.at)}${unsynced}`; state = 'ok'; }
+  else { text = `Not synced${unsynced}`; state = 'busy'; }
+  el.textContent = text;
+  el.dataset.state = state;
+}
+
+// ---------- Form ----------
+
+function updateSummary() {
+  const startVal = $('start').value;
+  const total = minutes('left') + minutes('right');
+  if (!startVal) {
+    $('summary').innerHTML = 'Pick a start time';
+    $('saveBtn').disabled = true;
+    return;
+  }
+  const end = new Date(new Date(startVal).getTime() + total * 60000);
+  $('summary').innerHTML = `Total <strong>${total} min</strong> &middot; Ends <strong>${fmtTime(end)}</strong>`;
+  $('saveBtn').disabled = total === 0;
+}
+
+function resetForm() {
+  editingId = null;
+  $('start').value = toLocalInput(new Date());
+  $('left').value = 0;
+  $('right').value = 0;
+  $('saveBtn').textContent = 'Save feed';
+  $('cancelBtn').hidden = true;
+  updateSummary();
+  render();
+}
+
+function save() {
+  const startVal = $('start').value;
+  if (!startVal) return;
+  const entry = {
+    id: editingId || `local-${crypto.randomUUID?.() || Date.now()}`,
+    start: new Date(startVal).toISOString(),
+    left: minutes('left'),
+    right: minutes('right'),
+  };
+  if (entry.left + entry.right === 0) return;
+  if (editingId) {
+    entry.pending = !isLocal(entry);
+    feeds = feeds.map((f) => (f.id === editingId ? entry : f));
+  } else {
+    feeds.push(entry);
+  }
+  sortFeeds();
+  persist();
+  resetForm();
+  sync();
+}
+
+function edit(id) {
+  const f = feeds.find((x) => x.id === id);
+  if (!f) return;
+  editingId = id;
+  $('start').value = toLocalInput(new Date(f.start));
+  $('left').value = f.left;
+  $('right').value = f.right;
+  $('saveBtn').textContent = 'Update feed';
+  $('cancelBtn').hidden = false;
+  updateSummary();
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function remove(id) {
+  const f = feeds.find((x) => x.id === id);
+  if (!f) return;
+  if (!confirm(`Delete feed at ${fmtTime(new Date(f.start))}?`)) return;
+  feeds = feeds.filter((x) => x.id !== id);
+  if (!isLocal(f)) deleted.push(id);
+  persist();
+  if (editingId === id) resetForm(); else render();
+  sync();
+}
+
+function render() {
+  renderStatus();
+  const container = $('history');
+  if (feeds.length === 0) {
+    container.innerHTML = '<div class="card empty">No feeds logged yet</div>';
+    return;
+  }
+  const groups = new Map();
+  for (const f of feeds) {
+    const key = new Date(f.start).toDateString();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(f);
+  }
+  container.innerHTML = '';
+  for (const [key, list] of groups) {
+    const totalMin = list.reduce((s, f) => s + f.left + f.right, 0);
+    const card = document.createElement('section');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="day-head">
+        <h2>${fmtDay(new Date(key))}</h2>
+        <span>${list.length} feed${list.length === 1 ? '' : 's'} &middot; ${totalMin} min</span>
+      </div>
+      <ul>${list.map((f) => `
+        <li data-id="${f.id}" class="${f.id === editingId ? 'editing' : ''}">
+          <div class="info">
+            <div class="time">${fmtTime(new Date(f.start))} – ${fmtTime(endOf(f))}${
+              isLocal(f) || f.pending ? ' <span class="pending" title="Not synced yet">•</span>' : ''}</div>
+            <div class="detail">L ${f.left} min &middot; R ${f.right} min &middot; ${f.left + f.right} min total</div>
+          </div>
+          <button class="del" aria-label="Delete">&times;</button>
+        </li>`).join('')}
+      </ul>`;
+    container.appendChild(card);
+  }
+}
+
+function exportCsv() {
+  const rows = [['start', 'end', 'left_min', 'right_min', 'total_min']];
+  for (const f of [...feeds].reverse()) {
+    rows.push([
+      toLocalInput(new Date(f.start)).replace('T', ' '),
+      toLocalInput(endOf(f)).replace('T', ' '),
+      f.left, f.right, f.left + f.right,
+    ]);
+  }
+  const blob = new Blob([rows.map((r) => r.join(',')).join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `feeds-${toLocalInput(new Date()).slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ---------- Settings ----------
+
+function openSettings() {
+  $('baseInput').value = base;
+  $('tokenInput').value = token;
+  $('settingsError').hidden = sync_.state !== 'auth';
+  $('settingsError').textContent = 'Airtable rejected these settings. Check the base ID and the token\'s scopes and base access.';
+  $('removeTokenBtn').hidden = !token && !base;
+  $('settings').showModal();
+}
+
+function saveSetting(key, value) {
+  if (value) localStorage.setItem(key, value);
+  else localStorage.removeItem(key);
+}
+
+function setSyncSettings(baseValue, tokenValue) {
+  base = baseValue.match(/app[A-Za-z0-9]{14}/)?.[0] || '';
+  token = tokenValue.trim();
+  saveSetting(K.base, base);
+  saveSetting(K.token, token);
+  sync_.state = 'idle';
+  $('settings').close();
+  render();
+  sync();
+}
+
+// ---------- Wiring ----------
+
+document.querySelectorAll('.stepper button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const id = btn.dataset.target;
+    $(id).value = Math.max(0, Math.min(180, minutes(id) + Number(btn.dataset.step)));
+    updateSummary();
+  });
+});
+['start', 'left', 'right'].forEach((id) => $(id).addEventListener('input', updateSummary));
+['left', 'right'].forEach((id) => $(id).addEventListener('focus', (e) => e.target.select()));
+$('nowBtn').addEventListener('click', () => { $('start').value = toLocalInput(new Date()); updateSummary(); });
+$('saveBtn').addEventListener('click', save);
+$('cancelBtn').addEventListener('click', resetForm);
+$('exportBtn').addEventListener('click', exportCsv);
+$('history').addEventListener('click', (e) => {
+  const li = e.target.closest('li');
+  if (!li) return;
+  if (e.target.closest('.del')) remove(li.dataset.id);
+  else if (e.target.closest('.info')) edit(li.dataset.id);
+});
+$('syncStatus').addEventListener('click', openSettings);
+$('saveTokenBtn').addEventListener('click', () => setSyncSettings($('baseInput').value, $('tokenInput').value));
+$('removeTokenBtn').addEventListener('click', () => setSyncSettings('', ''));
+$('closeSettingsBtn').addEventListener('click', () => $('settings').close());
+
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
+window.addEventListener('online', sync);
+setInterval(() => { if (document.visibilityState === 'visible') sync(); }, POLL_MS);
+
+resetForm();
+sync();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
