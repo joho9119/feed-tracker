@@ -32,6 +32,7 @@
     }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0;
     font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -98,7 +99,8 @@
   }
   .tabs {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     gap: 4px;
     padding: 4px;
     margin-bottom: 16px;
@@ -107,6 +109,26 @@
   }
   .tabs button { padding: 8px; background: none; color: var(--muted); font-weight: 600; }
   .tabs button[aria-selected=true] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+  #viewTabs { background: var(--card); border: 1px solid var(--border); }
+  #viewTabs button { padding: 10px 8px; }
+  #viewTabs button[aria-selected=true] { background: var(--accent); color: #fff; box-shadow: none; }
+  #viewTabs button[aria-selected=true].running::after { background: currentColor; }
+  .filters { display: grid; gap: 10px; }
+  .filters .tabs { margin: 0; }
+  .filter-input {
+    width: 100%;
+    min-width: 0;
+    font: inherit;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .filter-day { display: flex; gap: 8px; align-items: center; }
+  .filter-day label { font-size: 13px; color: var(--muted); }
+  .filter-status { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--muted); }
+  .filter-status button { background: none; color: var(--accent-dark); padding: 4px 0; font-size: 13px; }
   .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
   .toggle {
     padding: 20px 0;
@@ -288,12 +310,13 @@
     <button id="syncStatus" class="sync" type="button"></button>
   </header>
 
-  <section class="card">
-    <div class="tabs" role="tablist">
-      <button type="button" role="tab" data-mode="feed" id="feedTab">Feed</button>
-      <button type="button" role="tab" data-mode="diaper">Diaper</button>
-    </div>
+  <nav class="tabs" id="viewTabs" role="tablist">
+    <button type="button" role="tab" data-view="feed" id="feedTab">Feed</button>
+    <button type="button" role="tab" data-view="diaper">Diaper</button>
+    <button type="button" role="tab" data-view="history">History</button>
+  </nav>
 
+  <section class="card" id="entryView">
     <div id="feedFields">
       <label class="field" for="feedStart">Start of feed</label>
       <div class="row">
@@ -357,11 +380,30 @@
     <button class="btn-link" id="cancelBtn" type="button" hidden>Cancel edit</button>
   </section>
 
-  <div id="history"></div>
+  <div id="historyView" hidden>
+    <section class="card filters">
+      <input type="search" id="searchFilter" class="filter-input" placeholder="Search notes" autocomplete="off" enterkeyhint="search">
+      <div class="tabs" id="typeFilter">
+        <button type="button" data-type="all">All</button>
+        <button type="button" data-type="feed">Feeds</button>
+        <button type="button" data-type="diaper">Diapers</button>
+      </div>
+      <div class="filter-day">
+        <label for="dayFilter">Day</label>
+        <input type="date" id="dayFilter" class="filter-input">
+      </div>
+      <div class="filter-status" id="filterStatus" hidden>
+        <span id="filterCount"></span>
+        <button type="button" id="clearFilters">Clear filters</button>
+      </div>
+    </section>
 
-  <footer>
-    <button class="btn-secondary" id="exportBtn" type="button">Export CSV</button>
-  </footer>
+    <div id="history"></div>
+
+    <footer>
+      <button class="btn-secondary" id="exportBtn" type="button">Export CSV</button>
+    </footer>
+  </div>
 </main>
 
 <dialog id="settings">
@@ -432,6 +474,8 @@ let mode = 'feed';
 let editingId = null;
 let editingType = null;
 let expandedId = null;
+let view = 'feed'; // 'feed' | 'diaper' | 'history'
+const filters = { text: '', type: 'all', day: '' };
 let sync_ = { running: false, again: false, state: 'idle', at: null };
 
 // Older saved entries have no type (pre-diapers) or whole minutes instead of
@@ -725,9 +769,17 @@ function renderTimers() {
   $('feedTab').classList.toggle('running', !!timer);
 }
 
+function showView(v) {
+  view = v;
+  document.querySelectorAll('#viewTabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === v)));
+  $('entryView').hidden = v === 'history';
+  $('historyView').hidden = v !== 'history';
+  if (v === 'history') render();
+}
+
 function setMode(m) {
   mode = m;
-  document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.mode === m)));
+  showView(m);
   $('feedFields').hidden = m !== 'feed';
   $('diaperFields').hidden = m !== 'diaper';
   updateForm();
@@ -880,22 +932,47 @@ function entryHtml(e) {
       <div class="info">
         <div class="time">${time}${e.note ? NOTE_ICON : ''}${pending}</div>
         <div class="detail">${detail}</div>
-        ${expanded && e.note ? `<div class="note-text">${escapeHtml(e.note)}</div>` : ''}
+        ${(expanded || searchText()) && e.note ? `<div class="note-text">${escapeHtml(e.note)}</div>` : ''}
         ${expanded ? '<button class="edit-btn" type="button">Edit</button>' : ''}
       </div>
       <button class="del" aria-label="Delete">&times;</button>
     </li>`;
 }
 
+const localDay = (iso) => toLocalInput(new Date(iso)).slice(0, 10);
+const searchText = () => filters.text.trim().toLowerCase();
+
+function matchesFilters(e) {
+  const q = searchText();
+  return (filters.type === 'all' || e.type === filters.type)
+    && (!filters.day || localDay(e.start) === filters.day)
+    && (!q || (e.note || '').toLowerCase().includes(q));
+}
+
+function renderFilters() {
+  document.querySelectorAll('#typeFilter button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.type === filters.type)));
+  const today = new Date();
+  $('dayFilter').max = localDay(today.toISOString());
+  $('dayFilter').min = localDay(new Date(today - SYNC_DAYS * 86400000).toISOString());
+}
+
 function render() {
   renderStatus();
+  renderFilters();
   const container = $('history');
+  const shown = entries.filter(matchesFilters);
+  $('filterStatus').hidden = !(searchText() || filters.day || filters.type !== 'all');
+  $('filterCount').textContent = `Showing ${shown.length} of ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`;
   if (entries.length === 0) {
     container.innerHTML = '<div class="card empty">Nothing logged yet</div>';
     return;
   }
+  if (shown.length === 0) {
+    container.innerHTML = '<div class="card empty">Nothing matches these filters</div>';
+    return;
+  }
   const groups = new Map();
-  for (const e of entries) {
+  for (const e of shown) {
     const key = new Date(e.start).toDateString();
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(e);
@@ -978,12 +1055,25 @@ document.querySelectorAll('button[data-now]').forEach((btn) => {
   });
 });
 document.querySelectorAll('.timer').forEach((btn) => btn.addEventListener('click', () => toggleTimer(btn.dataset.side)));
-document.querySelectorAll('.tabs button').forEach((btn) => {
+document.querySelectorAll('#viewTabs button').forEach((btn) => {
   btn.addEventListener('click', () => {
-    if (btn.dataset.mode === mode) return;
-    if (editingType) resetForm(editingType);
-    setMode(btn.dataset.mode);
+    const v = btn.dataset.view;
+    if (v === 'history') return showView('history');
+    // Switching to the other entry type abandons an edit; visiting History doesn't.
+    if (v !== mode && editingType) resetForm(editingType);
+    setMode(v);
   });
+});
+$('searchFilter').addEventListener('input', (e) => { filters.text = e.target.value; render(); });
+$('dayFilter').addEventListener('change', (e) => { filters.day = e.target.value; render(); });
+document.querySelectorAll('#typeFilter button').forEach((btn) => {
+  btn.addEventListener('click', () => { filters.type = btn.dataset.type; render(); });
+});
+$('clearFilters').addEventListener('click', () => {
+  Object.assign(filters, { text: '', type: 'all', day: '' });
+  $('searchFilter').value = '';
+  $('dayFilter').value = '';
+  render();
 });
 ['peeBtn', 'poopBtn'].forEach((id) => $(id).addEventListener('click', () => { setPressed(id, !pressed(id)); updateForm(); }));
 $('feedStart').addEventListener('input', () => { startTouched = true; saveDraft(); updateForm(); });
