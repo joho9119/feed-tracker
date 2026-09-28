@@ -28,7 +28,8 @@ phone is back online. The app checks for the other phone's changes every 30 seco
 index.html            page markup
 sw.js                 service worker (must stay at the root so its scope covers the whole app)
 static/app.css        styles
-static/app.js         app logic and Airtable sync
+static/sync.js        Airtable sync (loaded first; see the header comment for its contract with app.js)
+static/app.js         UI: entry forms, timers, history and filters
 static/manifest.json  install manifest (paths inside are relative to static/)
 static/icons/         app icons
 ```
