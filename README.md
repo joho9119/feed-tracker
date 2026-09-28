@@ -21,3 +21,16 @@ that base. Both are stored only on the device.
 
 The app shows the last 30 days; full history lives in Airtable. Changes made offline are queued and pushed when the
 phone is back online. The app checks for the other phone's changes every 30 seconds while open.
+
+## Layout
+
+```
+index.html            page markup
+sw.js                 service worker (must stay at the root so its scope covers the whole app)
+static/app.css        styles
+static/app.js         app logic and Airtable sync
+static/manifest.json  install manifest (paths inside are relative to static/)
+static/icons/         app icons
+```
+
+When changing any file, bump `CACHE` in `sw.js` so installed copies pick up the update.
