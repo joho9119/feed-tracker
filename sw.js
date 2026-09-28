@@ -1,6 +1,6 @@
 // Network-first for the app's own files so updates show up right away, with
 // the cache as the offline fallback. Airtable API calls are never intercepted.
-const CACHE = 'feed-log-v14';
+const CACHE = 'feed-log-v15';
 const FILES = [
   './',
   'index.html',

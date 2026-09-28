@@ -140,11 +140,12 @@ async function pushChanges() {
       });
       batch.forEach((sent, j) => {
         const recId = res.records[j].id;
-        const current = entries.find((x) => x.id === sent.id);
+        const localId = sent.id; // read first: `sent` is usually `current`
+        const current = entries.find((x) => x.id === localId);
         if (!current) { deleted.push({ id: recId, type }); return; } // deleted while in flight
         current.pending = current !== sent; // edited while in flight: push again
         current.id = recId;
-        onEntryIdChanged(sent.id, recId);
+        onEntryIdChanged(localId, recId);
       });
       persist();
     }
